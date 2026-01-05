@@ -14,4 +14,5 @@ export const boardsApi = {
     apiFetch<{ members: BoardMember[] }>(`/boards/${boardId}/members/${memberId}`, { method: "PATCH", body }),
   removeMember: (boardId: string, memberId: string) =>
     apiFetch<{ members: BoardMember[] }>(`/boards/${boardId}/members/${memberId}`, { method: "DELETE" }),
+  members: (boardId: string) => apiFetch<{ members: BoardMember[] }>(`/boards/${boardId}/members`),
 };

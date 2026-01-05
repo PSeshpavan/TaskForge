@@ -3,6 +3,7 @@ import {
   createBoard,
   listBoardsForUser,
   getBoardWithMembers,
+  listBoardMembers,
   updateBoardName,
   deleteBoardAndMembers,
   addMemberByEmail,
@@ -105,6 +106,22 @@ export async function getBoardController(req: Request, res: Response, next: Next
     return res.json(payload);
   } catch (err) {
     console.error("[boardsController] getBoardController error", err);
+    next(err);
+  }
+}
+
+export async function listBoardMembersController(req: Request, res: Response, next: NextFunction) {
+  const userId = (req as any).user.id;
+  const { boardId } = req.params;
+  console.log("[boardsController] listBoardMembersController start", { userId, boardId });
+  try {
+    await assertBoardAccess(userId, boardId);
+    const members = await listBoardMembers(boardId);
+    const payload = members.map((member) => ({ ...toMemberShape(member), role: normalizeRole(member.role) }));
+    console.log("[boardsController] listBoardMembersController success", { boardId, count: payload.length });
+    return res.json({ members: payload });
+  } catch (err) {
+    console.error("[boardsController] listBoardMembersController error", err);
     next(err);
   }
 }

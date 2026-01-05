@@ -48,7 +48,14 @@ export async function listTasksController(req: Request, res: Response, next: Nex
   const { boardId } = req.params;
   console.log("[tasksController] listTasksController start", { userId, boardId });
   try {
-    const tasks = await listTasksForBoard(userId, boardId);
+    const labelsParam = req.query.labels;
+    let labels: string[] | undefined;
+    if (typeof labelsParam === "string") {
+      labels = labelsParam.split(",").map((label) => label.trim()).filter(Boolean);
+    } else if (Array.isArray(labelsParam)) {
+      labels = labelsParam.flatMap((value) => value.split(",").map((label) => label.trim())).filter(Boolean);
+    }
+    const tasks = await listTasksForBoard(userId, boardId, { labels });
     const payload = tasks.map(toTaskShape);
     console.log("[tasksController] listTasksController success", { boardId, count: payload.length });
     return res.json({ tasks: payload });

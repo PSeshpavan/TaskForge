@@ -1,15 +1,34 @@
 import { Task, TaskStatus } from "./tasks.model";
 import { Types } from "mongoose";
-import { assertBoardAccess as assertBoardAccessFromBoards, assertBoardRole } from "../boards/boards.service";
+import {
+  assertBoardAccess as assertBoardAccessFromBoards,
+  assertBoardRole,
+  getBoardMember,
+  type BoardRole,
+} from "../boards/boards.service";
 import { logActivity } from "../activity/activity.service";
 
 type Update = { taskId: string; status: "TODO" | "DOING" | "DONE"; order: number };
+
+async function validateAssignment(
+  boardId: string,
+  actorId: string,
+  actorRole: BoardRole,
+  assignedTo?: string | null
+) {
+  if (!assignedTo) return;
+  if (assignedTo === actorId) return;
+  if (actorRole !== "OWNER") throw Object.assign(new Error("Only owners can assign tasks to others"), { status: 403 });
+  const member = await getBoardMember(boardId, assignedTo);
+  if (!member) throw Object.assign(new Error("Assigned user is not a board member"), { status: 400 });
+}
 
 export async function createTask(boardId: string, createdBy: string, data: any) {
   const status = data.status ?? "TODO";
   const maxOrder = await Task.findOne({ boardId, status }).sort({ order: -1 }).select("order").lean().exec();
   const computedOrder = (maxOrder?.order ?? 0) + 1000;
-  await assertBoardRole(createdBy, boardId, ["OWNER", "EDITOR"]);
+  const actorRole = await assertBoardRole(createdBy, boardId, ["OWNER", "EDITOR"]);
+  await validateAssignment(boardId, createdBy, actorRole, data.assignedTo ?? null);
   const task = await Task.create({
     boardId: new Types.ObjectId(boardId),
     title: data.title,
@@ -26,9 +45,13 @@ export async function createTask(boardId: string, createdBy: string, data: any) 
   return task;
 }
 
-export async function listTasksForBoard(userId: string, boardId: string) {
+export async function listTasksForBoard(userId: string, boardId: string, options?: { labels?: string[] }) {
   await assertBoardAccessFromBoards(userId, boardId);
-  return Task.find({ boardId }).sort({ status: 1, order: 1, createdAt: 1 }).lean().exec();
+  const match: any = { boardId: new Types.ObjectId(boardId) };
+  if (options?.labels?.length) {
+    match.labels = { $in: options.labels };
+  }
+  return Task.find(match).sort({ status: 1, order: 1, createdAt: 1 }).lean().exec();
 }
 
 export async function getTaskById(taskId: string) {
@@ -45,7 +68,7 @@ export async function getTaskAndAssertAccess(userId: string, taskId: string) {
 export async function updateTask(userId: string, taskId: string, updates: any) {
   const existing = await Task.findById(taskId).exec();
   if (!existing) throw Object.assign(new Error("Not Found"), { status: 404 });
-  await assertBoardRole(userId, existing.boardId.toString(), ["OWNER", "EDITOR"]);
+  const actorRole = await assertBoardRole(userId, existing.boardId.toString(), ["OWNER", "EDITOR"]);
 
   const prevStatus = existing.status;
   const changed: string[] = [];
@@ -54,6 +77,9 @@ export async function updateTask(userId: string, taskId: string, updates: any) {
   const fields: (keyof typeof updates)[] = ["title", "description", "status", "priority", "dueDate", "labels", "assignedTo", "order"];
   for (const f of fields) {
     if (Object.prototype.hasOwnProperty.call(updates, f)) {
+      if (f === "assignedTo") {
+        await validateAssignment(existing.boardId.toString(), userId, actorRole, updates.assignedTo ?? null);
+      }
       (up as any)[f] = updates[f];
       changed.push(String(f));
     }

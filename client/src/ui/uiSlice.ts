@@ -11,6 +11,7 @@ const initialState = {
   priority: "ALL" as PriorityFilter,
   due: "ALL" as DueFilter,
   searchText: "",
+  labelFilters: [] as string[],
   isTaskModalOpen: false,
   editingTaskId: null as string | null,
   toast: null as ToastPayload | null,
@@ -46,6 +47,17 @@ const slice = createSlice({
     clearToast(state) {
       state.toast = null;
     },
+    toggleLabelFilter(state, action: PayloadAction<string>) {
+      const label = action.payload;
+      if (state.labelFilters.includes(label)) {
+        state.labelFilters = state.labelFilters.filter((item) => item !== label);
+      } else {
+        state.labelFilters.push(label);
+      }
+    },
+    clearLabelFilters(state) {
+      state.labelFilters = [];
+    },
   },
 });
 
@@ -58,6 +70,8 @@ export const {
   closeTaskModal,
   showToast,
   clearToast,
+  toggleLabelFilter,
+  clearLabelFilters,
 } = slice.actions;
 
 export default slice.reducer;

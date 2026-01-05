@@ -8,6 +8,7 @@ import {
   addMemberController,
   updateMemberController,
   removeMemberController,
+  listBoardMembersController,
 } from "./boards.controller";
 import { requireAuth } from "../../middleware/requireAuth";
 import { validateBody } from "../../middleware/validateBody";
@@ -31,6 +32,7 @@ router.get("/", listBoardsController);
 router.get("/:boardId", validateParams(boardIdParam), getBoardController);
 router.patch("/:boardId", validateParams(boardIdParam), validateBody(updateBoardSchema), patchBoardController);
 router.delete("/:boardId", validateParams(boardIdParam), deleteBoardController);
+router.get("/:boardId/members", validateParams(boardIdParam), listBoardMembersController);
 
 router.post("/:boardId/members", validateParams(boardIdParam), validateBody(addMemberSchema), addMemberController);
 router.patch(

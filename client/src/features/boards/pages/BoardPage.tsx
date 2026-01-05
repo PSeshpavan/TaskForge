@@ -19,6 +19,8 @@ import {
   setDueFilter,
   setSearchText,
   showToast,
+  toggleLabelFilter,
+  clearLabelFilters,
 } from "../../../ui/uiSlice";
 import type { RootState } from "../../../app/store/store";
 import { Button } from "../../../components/Button";
@@ -50,7 +52,7 @@ const initialSkeleton = Array.from({ length: 3 });
 export const BoardPage: React.FC = () => {
   const { boardId } = useParams<{ boardId: string }>();
   const dispatch = useDispatch();
-  const { status, priority, due, searchText } = useSelector((state: RootState) => state.ui);
+  const { status, priority, due, searchText, labelFilters } = useSelector((state: RootState) => state.ui);
 
   const boardQ = useBoardQuery(boardId ?? "");
   const tasksQ = useTasksQuery(boardId ?? "");
@@ -97,6 +99,15 @@ export const BoardPage: React.FC = () => {
   }, [tasksQ.data?.tasks]);
 
   const normalizedSearch = searchText.trim().toLowerCase();
+  const availableLabels = useMemo(() => {
+    const set = new Set<string>();
+    dndTasks.forEach((task) => {
+      (task.labels ?? []).forEach((label) => {
+        if (label.trim()) set.add(label);
+      });
+    });
+    return Array.from(set).sort();
+  }, [dndTasks]);
 
   const filteredTasks = useMemo(() => {
     let items = dndTasks;
@@ -119,8 +130,11 @@ export const BoardPage: React.FC = () => {
         return haystack.includes(normalizedSearch);
       });
     }
+    if (labelFilters.length) {
+      items = items.filter((task) => (task.labels ?? []).some((label) => labelFilters.includes(label)));
+    }
     return items;
-  }, [dndTasks, status, priority, due, normalizedSearch]);
+  }, [dndTasks, status, priority, due, normalizedSearch, labelFilters]);
 
   const columns = useMemo(() => {
     const map: Record<Status, Task[]> = { TODO: [], DOING: [], DONE: [] };
@@ -289,6 +303,9 @@ export const BoardPage: React.FC = () => {
       setInviteError(getApiMessage(err));
     }
   };
+
+  const toggleLabel = (label: string) => dispatch(toggleLabelFilter(label));
+  const handleClearLabelFilters = () => dispatch(clearLabelFilters());
 
   const handleRoleChange = async (member: BoardMember, newRole: ManageableBoardRole) => {
     if (!boardId || member.role === "OWNER" || member.role === newRole) return;
@@ -556,6 +573,43 @@ export const BoardPage: React.FC = () => {
             />
           </div>
         </div>
+
+        <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-5 shadow-xl shadow-black/40">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Labels</p>
+              <h2 className="text-lg font-semibold text-white">Filter by label</h2>
+            </div>
+            {labelFilters.length > 0 && (
+              <Button size="sm" variant="ghost" onClick={handleClearLabelFilters}>
+                Clear
+              </Button>
+            )}
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {availableLabels.length === 0 ? (
+              <p className="text-sm text-slate-400">No labels yet.</p>
+            ) : (
+              availableLabels.map((label) => {
+                const selected = labelFilters.includes(label);
+                return (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => toggleLabel(label)}
+                    className={`rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.3em] transition ${
+                      selected
+                        ? "border-sky-400 bg-sky-500/20 text-sky-200"
+                        : "border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-500 hover:text-white"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
       </div>
 
       <DragDropContext onDragEnd={handleDragEnd}>
@@ -606,12 +660,13 @@ export const BoardPage: React.FC = () => {
                                 {...dragProvided.dragHandleProps}
                                 className={dragSnapshot.isDragging ? "z-50" : ""}
                               >
-                                <TaskCard
-                                  task={task}
-                                  boardId={boardId ?? ""}
-                                  onOpen={handleOpenTask}
-                                  canEdit={canEdit}
-                                />
+                              <TaskCard
+                                task={task}
+                                boardId={boardId ?? ""}
+                                onOpen={handleOpenTask}
+                                canEdit={canEdit}
+                                members={members}
+                              />
                               </div>
                             )}
                           </Draggable>

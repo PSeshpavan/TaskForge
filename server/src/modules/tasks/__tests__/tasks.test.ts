@@ -77,6 +77,41 @@ describe("Tasks module", () => {
     expect(res.status).toBe(403);
   });
 
+  test("owner can assign task to board member", async () => {
+    const owner = await registerAgent("AssignOwner", "assignowner@example.com");
+    const memberAgent = await registerAgent("AssignMember", "assignmember@example.com");
+    const memberEmail = "assignmember@example.com";
+    const boardRes = await owner.post("/boards").send({ name: "AssignBoard" });
+    const boardId = boardRes.body.board.id;
+    await owner.post(`/boards/${boardId}/members`).send({ email: memberEmail });
+    const membersRes = await owner.get(`/boards/${boardId}/members`);
+    const memberEntry = membersRes.body.members.find((m: any) => m.user.email === memberEmail);
+    expect(memberEntry).toBeTruthy();
+    const taskRes = await owner.post(`/boards/${boardId}/tasks`).send({ title: "Assigned Task" });
+    const taskId = taskRes.body.task.id;
+    const assignRes = await owner.patch(`/tasks/${taskId}`).send({ assignedTo: memberEntry.user.id });
+    expect(assignRes.status).toBe(200);
+    expect(assignRes.body.task.assignedTo).toBe(memberEntry.user.id);
+  });
+
+  test("member cannot assign a task to another member", async () => {
+    const owner = await registerAgent("AssignOwner2", "assignowner2@example.com");
+    const memberOneAgent = await registerAgent("AssignMember1", "assignmember1@example.com");
+    const memberTwoAgent = await registerAgent("AssignMember2", "assignmember2@example.com");
+    const boardRes = await owner.post("/boards").send({ name: "AssignBoard2" });
+    const boardId = boardRes.body.board.id;
+    await owner.post(`/boards/${boardId}/members`).send({ email: "assignmember1@example.com" });
+    await owner.post(`/boards/${boardId}/members`).send({ email: "assignmember2@example.com" });
+    const membersRes = await owner.get(`/boards/${boardId}/members`);
+    const otherMember = membersRes.body.members.find((m: any) => m.user.email === "assignmember2@example.com");
+    expect(otherMember).toBeTruthy();
+
+    const createRes = await memberOneAgent.post(`/boards/${boardId}/tasks`).send({ title: "Member Task" });
+    const taskId = createRes.body.task.id;
+    const assignRes = await memberOneAgent.patch(`/tasks/${taskId}`).send({ assignedTo: otherMember.user.id });
+    expect(assignRes.status).toBe(403);
+  });
+
   test("PATCH changing status logs TASK_MOVED", async () => {
     const owner = await registerAgent("OwnerM", "ownerm@example.com");
     const bRes = await owner.post("/boards").send({ name: "MoveBoard" });

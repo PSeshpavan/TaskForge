@@ -41,6 +41,14 @@ export async function getBoardWithMembers(boardId: string) {
   return { board, members };
 }
 
+export async function listBoardMembers(boardId: string) {
+  return BoardMember.find({ boardId }).populate("userId").lean().exec();
+}
+
+export async function getBoardMember(boardId: string, userId: string) {
+  return BoardMember.findOne({ boardId, userId }).lean().exec();
+}
+
 export async function getUserBoardRole(userId: string, boardId: string): Promise<BoardRole | null> {
   const board = await Board.findById(boardId).lean().exec();
   if (!board) return null;
