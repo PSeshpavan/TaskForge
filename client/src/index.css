@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+
+
+
+/* ---- Nice dark scrollbar (works in Chrome/Edge/Safari + Firefox) ---- */
+.custom-scrollbar {
+  scrollbar-width: thin;                 /* Firefox */
+  scrollbar-color: rgba(148, 163, 184, .35) transparent;  /* thumb | track */
+  scrollbar-gutter: stable;              /* prevents layout shift */
+}
+
+/* WebKit (Chrome/Edge/Safari) */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, .12);
+  border: 3px solid rgba(2, 6, 23, .85);
+}
+
+.custom-scrollbar:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, .40);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:active {
+  background-color: rgba(56, 189, 248, .55); /* subtle sky highlight */
+}
+
+.custom-scrollbar::-webkit-scrollbar-button {
+  display: none;
+}
+
+

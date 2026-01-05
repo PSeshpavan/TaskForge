@@ -1,0 +1,20 @@
+{
+  "name": "taskforge",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "workspaces": ["client", "server"],
+  "scripts": {
+    "dev": "concurrently \"npm --prefix server run dev\" \"npm --prefix client run dev\"",
+    "test": "npm --prefix server test && npm --prefix client test",
+    "test:server": "npm -w server test",
+    "test:client": "npm -w client test"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
