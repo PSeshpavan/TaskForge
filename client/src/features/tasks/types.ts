@@ -12,4 +12,5 @@ export type Task = {
   order: number;
   createdAt: string;
   updatedAt: string;
+  _id?: string;
 };
