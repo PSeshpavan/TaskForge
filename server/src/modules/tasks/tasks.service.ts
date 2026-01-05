@@ -1,6 +1,6 @@
 import { Task, TaskStatus } from "./tasks.model";
 import { Types } from "mongoose";
-import { assertBoardAccess as assertBoardAccessFromBoards } from "../boards/boards.service";
+import { assertBoardAccess as assertBoardAccessFromBoards, assertBoardRole } from "../boards/boards.service";
 import { logActivity } from "../activity/activity.service";
 
 type Update = { taskId: string; status: "TODO" | "DOING" | "DONE"; order: number };
@@ -9,6 +9,7 @@ export async function createTask(boardId: string, createdBy: string, data: any) 
   const status = data.status ?? "TODO";
   const maxOrder = await Task.findOne({ boardId, status }).sort({ order: -1 }).select("order").lean().exec();
   const computedOrder = (maxOrder?.order ?? 0) + 1000;
+  await assertBoardRole(createdBy, boardId, ["OWNER", "EDITOR"]);
   const task = await Task.create({
     boardId: new Types.ObjectId(boardId),
     title: data.title,
@@ -44,7 +45,7 @@ export async function getTaskAndAssertAccess(userId: string, taskId: string) {
 export async function updateTask(userId: string, taskId: string, updates: any) {
   const existing = await Task.findById(taskId).exec();
   if (!existing) throw Object.assign(new Error("Not Found"), { status: 404 });
-  await assertBoardAccessFromBoards(userId, existing.boardId.toString());
+  await assertBoardRole(userId, existing.boardId.toString(), ["OWNER", "EDITOR"]);
 
   const prevStatus = existing.status;
   const changed: string[] = [];
@@ -73,7 +74,7 @@ export async function updateTask(userId: string, taskId: string, updates: any) {
 export async function deleteTask(userId: string, taskId: string) {
   const task = await Task.findById(taskId).exec();
   if (!task) throw Object.assign(new Error("Not Found"), { status: 404 });
-  await assertBoardAccessFromBoards(userId, task.boardId.toString());
+  await assertBoardRole(userId, task.boardId.toString(), ["OWNER", "EDITOR"]);
   await Task.deleteOne({ _id: taskId }).exec();
   await logActivity({ boardId: task.boardId.toString(), actorId: userId, type: "TASK_DELETED", meta: { taskId } });
   return true;
@@ -97,9 +98,7 @@ export async function deleteTask(userId: string, taskId: string) {
 // }
 
 export async function reorderTasks(userId: string, boardId: string, updates: Update[]) {
-  // Access check
-  const { assertBoardAccess } = await import("../boards/boards.service");
-  await assertBoardAccess(userId, boardId);
+  await assertBoardRole(userId, boardId, ["OWNER", "EDITOR"]);
 
   const boardObjectId = new Types.ObjectId(boardId);
 

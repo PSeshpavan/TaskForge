@@ -19,6 +19,7 @@ export type UpdateTaskInput = Partial<{
   dueDate: string | null;
   labels: string[];
   assignedTo: string | null;
+  order: number;
 }>;
 
 export const tasksApi = {

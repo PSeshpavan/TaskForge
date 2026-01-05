@@ -1,6 +1,6 @@
 import mongoose, { Document, Model, Schema, Types } from "mongoose";
 
-export type MemberRole = "OWNER" | "MEMBER";
+export type MemberRole = "OWNER" | "EDITOR" | "VIEWER" | "MEMBER";
 
 export interface IBoardMember extends Document {
   boardId: Types.ObjectId;
@@ -14,7 +14,7 @@ const BoardMemberSchema = new Schema<IBoardMember>(
   {
     boardId: { type: Schema.Types.ObjectId, ref: "Board", required: true, index: true },
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
-    role: { type: String, enum: ["OWNER", "MEMBER"], default: "MEMBER" },
+    role: { type: String, enum: ["OWNER", "EDITOR", "VIEWER", "MEMBER"], default: "VIEWER" },
   },
   { timestamps: true }
 );

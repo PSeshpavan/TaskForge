@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import type { DropResult } from "@hello-pangea/dnd";
 
@@ -8,6 +8,9 @@ import { useTasksQuery } from "../../tasks/hooks/useTasksQuery";
 import { useActivityQuery } from "../../activity/hooks/useActivityQuery";
 import { useAddMember } from "../hooks/useAddMember";
 import { useReorderTasks } from "../../tasks/hooks/useReorderTasks";
+import { useUpdateMemberRole } from "../hooks/useUpdateMemberRole";
+import { useRemoveMember } from "../hooks/useRemoveMember";
+import { useDeleteBoard } from "../hooks/useDeleteBoard";
 import { useDispatch, useSelector } from "react-redux";
 import {
   openTaskModal,
@@ -27,9 +30,12 @@ import { EmptyState } from "../../../components/EmptyState";
 import { Spinner } from "../../../components/Spinner";
 import { Modal } from "../../../components/Modal";
 import { Badge } from "../../../components/Badge";
+import { ConfirmModal } from "../../../components/ConfirmModal";
 import type { ApiError } from "../../../lib/apiClient";
 
 import type { Task } from "../../tasks/types";
+import type { BoardMember, ManageableBoardRole } from "../types";
+import { ChevronLeft } from "lucide-react";
 
 const statuses = [
   { id: "TODO", label: "To do", color: "bg-amber-500" },
@@ -58,11 +64,31 @@ export const BoardPage: React.FC = () => {
   const [isInviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteError, setInviteError] = useState<string | null>(null);
+  const [memberToRemove, setMemberToRemove] = useState<BoardMember | null>(null);
+  const [isDeleteBoardOpen, setDeleteBoardOpen] = useState(false);
 
   const boardData = boardQ.data;
   const board = boardData?.board;
   const members = boardData?.members ?? [];
   const activities = actQ.data?.activities ?? [];
+  const sortedMembers = useMemo(() => {
+    return [...members].sort((a, b) => {
+      if (a.role === "OWNER" && b.role !== "OWNER") return -1;
+      if (b.role === "OWNER" && a.role !== "OWNER") return 1;
+      const aName = (a.user.name || a.user.email || "").toLowerCase();
+      const bName = (b.user.name || b.user.email || "").toLowerCase();
+      return aName.localeCompare(bName);
+    });
+  }, [members]);
+
+  const myRole = boardData?.myRole ?? "VIEWER";
+  const canEdit = myRole === "OWNER" || myRole === "EDITOR";
+  const canManageMembers = myRole === "OWNER";
+  const navigate = useNavigate();
+  const getApiMessage = (err: unknown) => {
+    const apiError = err as ApiError;
+    return apiError?.data?.message || (apiError instanceof Error ? apiError.message : "Something went wrong");
+  };
 
   useEffect(() => {
     if (tasksQ.data?.tasks) {
@@ -161,7 +187,11 @@ export const BoardPage: React.FC = () => {
 
 
   const handleDragEnd = async (result: DropResult) => {
-  const { source, destination, draggableId } = result;
+    if (!canEdit) {
+    dispatch(showToast({ message: "Read-only access", variant: "error" }));
+    return;
+  }
+  const { source, destination } = result;
   if (!destination || !boardId) return;
 
   const fromStatus = source.droppableId as Status;
@@ -234,22 +264,83 @@ export const BoardPage: React.FC = () => {
 
 
 
+  const handleOpenTask = (taskId: string) => {
+    if (!canEdit) {
+      dispatch(showToast({ message: "Read-only access", variant: "error" }));
+      return;
+    }
+    dispatch(openTaskModal(taskId));
+  };
+
+  const updateMemberRole = useUpdateMemberRole(boardId ?? "");
+  const removeMemberMutation = useRemoveMember(boardId ?? "");
+  const deleteBoardMutation = useDeleteBoard(boardId ?? "");
+
   const handleInvite = async () => {
     if (!inviteEmail.trim() || !boardId) return;
     setInviteError(null);
+    if (!canManageMembers) return;
     try {
       await addMember.mutateAsync({ email: inviteEmail.trim() });
       dispatch(showToast({ message: "Member invited", variant: "success" }));
       setInviteEmail("");
       setInviteOpen(false);
     } catch (err) {
-      const apiError = err as ApiError;
-      setInviteError(apiError?.data?.message || apiError.message || "Unable to invite member");
+      setInviteError(getApiMessage(err));
     }
   };
 
-  const owner = members.find((m) => m.role === "OWNER");
-  const visibleMembers = members.slice(0, 5);
+  const handleRoleChange = async (member: BoardMember, newRole: ManageableBoardRole) => {
+    if (!boardId || member.role === "OWNER" || member.role === newRole) return;
+    try {
+      await updateMemberRole.mutateAsync({ memberId: member.id, role: newRole });
+      const memberLabel = member.user.name || member.user.email;
+      dispatch(showToast({ message: `${memberLabel} is now ${newRole}`, variant: "success" }));
+    } catch (err) {
+      dispatch(
+        showToast({
+          message: getApiMessage(err),
+          variant: "error",
+        })
+      );
+    }
+  };
+
+  const handleConfirmRemove = async () => {
+    if (!memberToRemove || !boardId) return;
+    try {
+      await removeMemberMutation.mutateAsync(memberToRemove.id);
+      dispatch(showToast({ message: "Member removed", variant: "info" }));
+      setMemberToRemove(null);
+    } catch (err) {
+      dispatch(
+        showToast({
+          message: getApiMessage(err),
+          variant: "error",
+        })
+      );
+    }
+  };
+
+  const handleDeleteBoard = async () => {
+    if (!boardId) return;
+    try {
+      await deleteBoardMutation.mutateAsync();
+      dispatch(showToast({ message: "Board deleted", variant: "info" }));
+      navigate("/boards");
+    } catch (err) {
+      dispatch(
+        showToast({
+          message: getApiMessage(err),
+          variant: "error",
+        })
+      );
+    }
+  };
+
+  const visibleMembers = sortedMembers.slice(0, 5);
+  const ownerUser = boardData?.owner ?? sortedMembers.find((m) => m.role === "OWNER")?.user;
+  const roleLabel = myRole === "OWNER" ? "Owner" : myRole === "EDITOR" ? "Editor" : "Viewer";
 
   if (boardQ.isLoading) {
     return (
@@ -270,9 +361,9 @@ export const BoardPage: React.FC = () => {
           <div>
             <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Board</p>
             <h1 className="text-3xl font-semibold text-white">{board.name}</h1>
-            {owner && (
+            {ownerUser && (
               <p className="text-sm text-slate-400">
-                Owned by <span className="text-slate-100">{owner.user.name}</span>
+                Owned by <span className="text-slate-100">{ownerUser.name || ownerUser.email}</span>
               </p>
             )}
             <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -301,23 +392,111 @@ export const BoardPage: React.FC = () => {
             </div>
             {reorderError && <p className="mt-2 text-xs text-rose-400">{reorderError}</p>}
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <Link to="/boards" className="text-sm text-slate-400 hover:text-white">
-              ← Back to boards
-            </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          <Link to="/boards" className="text-sm text-slate-400 hover:text-white">
+             <div className="flex items-center">
+               <ChevronLeft className="mr-0.5" size={20} />
+               Back to boards
+             </div>
+          </Link>
+          {canEdit && (
             <Button variant="ghost" onClick={() => dispatch(openTaskModal())}>
               New task
             </Button>
+          )}
+          {canManageMembers && (
             <Button
-              variant="secondary"
-              onClick={() => {
-                setInviteOpen(true);
-                setInviteError(null);
-              }}
+              variant="danger"
+              onClick={() => setDeleteBoardOpen(true)}
+              disabled={deleteBoardMutation.isPending}
             >
-              Invite member
+              {deleteBoardMutation.isPending ? "Deleting..." : "Delete board"}
             </Button>
+          )}
+          <Badge variant="outline" className="text-[10px] uppercase tracking-[0.3em]">
+            {roleLabel} access
+          </Badge>
+        </div>
+      </div>
+
+        <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-5 shadow-xl shadow-black/40">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Members</p>
+              <h2 className="text-lg font-semibold text-white">Team access</h2>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <Badge variant="outline" className="text-[10px] uppercase tracking-[0.3em]">
+                {sortedMembers.length} members
+              </Badge>
+              {canManageMembers && (
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setInviteOpen(true);
+                    setInviteError(null);
+                  }}
+                >
+                  Invite member
+                </Button>
+              )}
+            </div>
           </div>
+          <div className="mt-4 space-y-3">
+            {sortedMembers.length === 0 ? (
+              <p className="text-sm text-slate-400">No members yet.</p>
+            ) : (
+              sortedMembers.map((member) => {
+                const displayName = member.user.name || member.user.email;
+                const badgeVariant = member.role === "OWNER" ? "primary" : member.role === "EDITOR" ? "warning" : "outline";
+                const badgeLabel =
+                  member.role === "OWNER" ? "Owner" : member.role === "EDITOR" ? "Editor" : "Viewer";
+                return (
+                  <div
+                    key={member.id}
+                    className="flex flex-col gap-3 rounded-2xl border border-slate-800/50 bg-slate-900/60 p-4 shadow-inner transition sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div>
+                      <p className="text-sm font-semibold text-white">{displayName}</p>
+                      <p className="text-[10px] text-slate-400">{member.user.email}</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant={badgeVariant}>{badgeLabel}</Badge>
+                      {canManageMembers && member.role !== "OWNER" && (
+                        <>
+                          <select
+                            value={member.role}
+                            onChange={(event) =>
+                              handleRoleChange(member, event.target.value as ManageableBoardRole)
+                            }
+                            disabled={updateMemberRole.isPending}
+                            aria-label="Change role"
+                            className="rounded-2xl border border-slate-700/50 bg-slate-900/60 px-3 py-1 text-xs text-white focus:border-sky-400 focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
+                          >
+                            <option value="EDITOR">Editor</option>
+                            <option value="VIEWER">Viewer</option>
+                          </select>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            className="text-rose-300"
+                            onClick={() => setMemberToRemove(member)}
+                          >
+                            Remove
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+          {!canManageMembers && (
+            <p className="mt-3 text-xs text-slate-500">
+              Only the board owner can manage member roles and invitations.
+            </p>
+          )}
         </div>
 
         <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-5 shadow-xl shadow-black/40">
@@ -430,7 +609,8 @@ export const BoardPage: React.FC = () => {
                                 <TaskCard
                                   task={task}
                                   boardId={boardId ?? ""}
-                                  onOpen={(id) => dispatch(openTaskModal(id))}
+                                  onOpen={handleOpenTask}
+                                  canEdit={canEdit}
                                 />
                               </div>
                             )}
@@ -492,6 +672,27 @@ export const BoardPage: React.FC = () => {
           </div>
         </div>
       </Modal>
+      <ConfirmModal
+        open={Boolean(memberToRemove)}
+        title="Remove member"
+        description={`Remove ${memberToRemove?.user.name || memberToRemove?.user.email} from this board?`}
+        confirmText="Remove"
+        danger
+        isLoading={removeMemberMutation.isPending}
+        onConfirm={handleConfirmRemove}
+        onCancel={() => setMemberToRemove(null)}
+      />
+      <ConfirmModal
+        open={isDeleteBoardOpen}
+        title="Delete board"
+        description="This will permanently delete the board and all its tasks."
+        confirmText="Delete"
+        danger
+        isLoading={deleteBoardMutation.isPending}
+        onConfirm={handleDeleteBoard}
+        onCancel={() => setDeleteBoardOpen(false)}
+      />
     </div>
   );
 };
+

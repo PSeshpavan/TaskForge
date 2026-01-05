@@ -1,73 +1,46 @@
-# React + TypeScript + Vite
+# TaskForge Client
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This folder contains the Vite + React + TypeScript single‑page app for TaskForge. It consumes the Express API over cookies and implements the kanban-style boards, task modal, activity feed, and member management UI.
 
-Currently, two official plugins are available:
+## Stack highlights
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Vite** for fast dev feedback and optimized builds.
+- **React 19 + React Router 7** to render pages and guard authenticated views.
+- **React Query v5** for data fetching/caching from `/boards`, `/tasks`, `/activity`.
+- **Redux Toolkit** for UI state (filters, toast, modals).
+- **Tailwind CSS** for styling; shared primitives live in `/src/components`.
+- **`@hello-pangea/dnd`** for kanban drag/drop with server-side `order` persistence.
 
-## React Compiler
+## Scripts
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- `npm run dev` – start the Vite dev server (`http://localhost:5173`); proxies API calls via `VITE_API_BASE_URL`.
+- `npm run build` – type-check and produce production assets in `/client/dist`.
+- `npm run preview` – preview the built app locally.
+- `npm run lint` – run ESLint with TypeScript rules.
 
-## Expanding the ESLint configuration
+## Environment
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+Create a `.env` file in the `/client` directory when necessary. The only variable consumed here is:
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```env
+VITE_API_BASE_URL=http://localhost:4000
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+It should point to the running backend (matching `CLIENT_ORIGIN` on the server) so cookies flow correctly.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Development notes
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+- Components live under `/src/components`, feature folders under `/src/features`, and shared utilities in `/src/lib`.
+- UI state (filters, modals, toast) is managed via `/src/ui/uiSlice.ts`.
+- Use `/src/features/tasks/components/TaskModal.tsx` and `/src/features/boards/pages/BoardPage.tsx` as references when extending workflows.
+- Run `npm run lint` before pushing large UI changes; ensure `tailwind.config` is updated if new classes are introduced (see `/src/index.css`).
+
+## Testing
+
+Frontend tests run with Vitest and React Testing Library. Execute:
+
+```bash
+npm run test
 ```
+
+or scoped `npm --prefix client test`.

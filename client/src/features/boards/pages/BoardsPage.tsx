@@ -1,13 +1,13 @@
 import React, { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { useMeQuery } from "../../../features/auth/hooks/useMeQuery";
 import { useBoardsQuery } from "../hooks/useBoardsQuery";
 import { useCreateBoard } from "../hooks/useCreateBoard";
 import { Button } from "../../../components/Button";
 import { Input } from "../../../components/Input";
 import { Card } from "../../../components/Card";
 import { EmptyState } from "../../../components/EmptyState";
-import { Spinner } from "../../../components/Spinner";
-import { Badge } from "../../../components/Badge";
+import type { BoardSummary } from "../types";
 
 function formatDate(value?: string) {
   if (!value) return "";
@@ -20,8 +20,9 @@ export const BoardsPage: React.FC = () => {
   const boardsQ = useBoardsQuery();
   const createBoard = useCreateBoard();
   const [name, setName] = useState("");
+  const { data: meData } = useMeQuery();
 
-  const boards = useMemo(() => (boardsQ.data as any)?.boards ?? [], [boardsQ.data]);
+  const boards = useMemo(() => boardsQ.data?.boards ?? [], [boardsQ.data]);
   const loading = boardsQ.isLoading;
 
   const onCreate = async (event: React.FormEvent) => {
@@ -32,7 +33,15 @@ export const BoardsPage: React.FC = () => {
     setName("");
   };
 
-  const myRole = (b.myRole ?? b.role ?? "MEMBER") as "OWNER" | "EDITOR" | "VIEWER" | "MEMBER";
+  const currentUserId = meData?.user?.id;
+  const renderOwnerLabel = (board: BoardSummary) => {
+    if (currentUserId && board.ownerId === currentUserId) return "Owner you";
+    if (board.owner?.name || board.owner?.email) {
+      const ownerLabel = board.owner.name || board.owner.email;
+      return `Owner ${ownerLabel}`;
+    }
+    return "Shared with you";
+  };
 
   return (
     <div className="min-h-screen bg-slate-950 text-white">
@@ -51,11 +60,6 @@ export const BoardsPage: React.FC = () => {
               Keep projects organized with kanban-style boards.
             </p>
           </div>
-          {/* <div className="flex flex-wrap items-center gap-3">
-            <Badge variant="primary">React Query</Badge>
-            <Badge variant="neutral">Redux Toolkit</Badge>
-            <Badge variant="outline">Tailwind</Badge>
-          </div> */}
         </Card>
 
         <div className="grid gap-6 lg:grid-cols-12">
@@ -107,7 +111,7 @@ export const BoardsPage: React.FC = () => {
               />
             ) : (
               <div className="grid gap-4 sm:grid-cols-2">
-                {boards.map((board: any) => (
+                {boards.map((board) => (
                   <Link key={board.id} to={`/boards/${board.id}`}>
                     <div className="group flex h-full flex-col justify-between rounded-2xl border border-white/10 bg-slate-900/60 p-5 transition hover:border-sky-500/40 hover:bg-slate-900/80">
                       <div>
@@ -117,7 +121,7 @@ export const BoardsPage: React.FC = () => {
                         </p>
                       </div>
                       <div className="mt-4 flex items-center justify-between gap-3">
-                        <span className="text-xs text-slate-400">Owner you</span>
+                        <span className="text-xs text-slate-400">{renderOwnerLabel(board)}</span>
                         <Button variant="ghost" size="sm">
                           Open
                         </Button>

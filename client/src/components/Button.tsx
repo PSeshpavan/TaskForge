@@ -1,9 +1,11 @@
 import React from "react";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger";
+type ButtonSize = "sm" | "md" | "lg";
 
 type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: Variant;
+  size?: ButtonSize;
 };
 
 function cx(...classes: Array<string | undefined | false | null>) {
@@ -12,15 +14,22 @@ function cx(...classes: Array<string | undefined | false | null>) {
 
 export const Button: React.FC<ButtonProps> = ({
   variant = "primary",
+  size = "md",
   className,
   disabled,
   ...props
 }) => {
   const base =
-    "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold " +
+    "inline-flex items-center justify-center gap-2 rounded-xl font-semibold " +
     "transition active:scale-[0.99] focus:outline-none focus-visible:ring-2 " +
     "focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 " +
     "disabled:cursor-not-allowed disabled:opacity-50";
+
+  const sizeClasses: Record<ButtonSize, string> = {
+    sm: "px-3 py-1.5 text-xs",
+    md: "px-4 py-2 text-sm",
+    lg: "px-5 py-3 text-base",
+  };
 
   const variants: Record<Variant, string> = {
     // ✅ Updated primary: clear accent, readable, looks like the “main” action
@@ -45,7 +54,7 @@ export const Button: React.FC<ButtonProps> = ({
     <button
       {...props}
       disabled={disabled}
-      className={cx(base, variants[variant], className)}
+      className={cx(base, sizeClasses[size], variants[variant], className)}
     />
   );
 };

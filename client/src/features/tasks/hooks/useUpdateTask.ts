@@ -1,16 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { tasksApi } from "../api/tasksApi";
+import { tasksApi, type UpdateTaskInput } from "../api/tasksApi";
 import type { Task } from "../types";
-
-type UpdateTaskInput = Partial<{
-  title: string;
-  description: string;
-  status: "TODO" | "DOING" | "DONE";
-  priority: "LOW" | "MEDIUM" | "HIGH";
-  dueDate: string | null;
-  labels: string[];
-  assignedTo: string | null;
-}>;
 
 export function useUpdateTask(boardId: string) {
   const qc = useQueryClient();

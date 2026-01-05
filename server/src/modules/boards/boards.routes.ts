@@ -6,11 +6,20 @@ import {
   patchBoardController,
   deleteBoardController,
   addMemberController,
+  updateMemberController,
+  removeMemberController,
 } from "./boards.controller";
 import { requireAuth } from "../../middleware/requireAuth";
 import { validateBody } from "../../middleware/validateBody";
 import { validateParams } from "../../middleware/validateParams";
-import { createBoardSchema, boardIdParam, updateBoardSchema, addMemberSchema } from "./boards.validation";
+import {
+  createBoardSchema,
+  boardIdParam,
+  updateBoardSchema,
+  addMemberSchema,
+  boardMemberIdParam,
+  updateMemberRoleSchema,
+} from "./boards.validation";
 import { getActivities } from "../activity/activity.service";
 
 const router = Router();
@@ -24,6 +33,13 @@ router.patch("/:boardId", validateParams(boardIdParam), validateBody(updateBoard
 router.delete("/:boardId", validateParams(boardIdParam), deleteBoardController);
 
 router.post("/:boardId/members", validateParams(boardIdParam), validateBody(addMemberSchema), addMemberController);
+router.patch(
+  "/:boardId/members/:memberId",
+  validateParams(boardMemberIdParam),
+  validateBody(updateMemberRoleSchema),
+  updateMemberController
+);
+router.delete("/:boardId/members/:memberId", validateParams(boardMemberIdParam), removeMemberController);
 
 router.get("/:boardId/activity", validateParams(boardIdParam), async (req, res, next) => {
   const func = "[boardsRouter] activityRoute";

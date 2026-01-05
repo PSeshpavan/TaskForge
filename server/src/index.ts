@@ -8,7 +8,7 @@ let server: ReturnType<typeof app.listen> | undefined;
 async function start() {
   await connectDB();
   server = app.listen(env.PORT, () => {
-    console.log(`✅ Server listening on http://localhost:${env.PORT} (${env.NODE_ENV})`);
+    console.log(`✅ Server listening on port ${env.PORT} (${env.NODE_ENV})`);
   });
 }
 

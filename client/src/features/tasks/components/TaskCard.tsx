@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import type { Task } from "../types";
 import { Badge } from "../../../components/Badge";
-import { Button } from "../../../components/Button";
 import { useUpdateTask } from "../hooks/useUpdateTask";
 import { useDispatch } from "react-redux";
 import { showToast } from "../../../ui/uiSlice";
@@ -10,10 +9,11 @@ import { ChevronLeft, ChevronRight, Edit2, Calendar, GripVertical } from "lucide
 
 const statusOrder: Task["status"][] = ["TODO", "DOING", "DONE"];
 
-export const TaskCard: React.FC<{ task: Task; onOpen: (id: string) => void; boardId: string }> = ({
+export const TaskCard: React.FC<{ task: Task; onOpen: (id: string) => void; boardId: string; canEdit?: boolean }> = ({
   task,
   onOpen,
   boardId,
+  canEdit = true,
 }) => {
   const queryClient = useQueryClient();
   const dispatch = useDispatch();
@@ -33,6 +33,9 @@ export const TaskCard: React.FC<{ task: Task; onOpen: (id: string) => void; boar
   };
 
   const handleMove = async (direction: "forward" | "backward") => {
+    if (!canEdit) {
+      return;
+    }
     const targetIndex = direction === "forward" ? statusIndex + 1 : statusIndex - 1;
     if (targetIndex < 0 || targetIndex >= statusOrder.length) return;
     const targetStatus = statusOrder[targetIndex];
@@ -61,40 +64,42 @@ export const TaskCard: React.FC<{ task: Task; onOpen: (id: string) => void; boar
         <Badge variant={task.priority === "HIGH" ? "danger" : task.priority === "MEDIUM" ? "warning" : "primary"}>
           {task.priority}
         </Badge>
-        <div className="flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              handleMove("backward");
-            }}
-            disabled={!canMoveBackward || update.isPending}
-            className="rounded-full border border-slate-700/60 bg-black/30 p-1 text-slate-400 hover:border-slate-500 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <ChevronLeft size={14} />
-          </button>
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              handleMove("forward");
-            }}
-            disabled={!canMoveForward || update.isPending}
-            className="rounded-full border border-slate-700/60 bg-black/30 p-1 text-slate-400 hover:border-slate-500 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <ChevronRight size={14} />
-          </button>
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              onOpen(task.id);
-            }}
-            className="rounded-full border border-slate-700/60 bg-black/30 p-1 text-slate-400 hover:border-slate-500 hover:text-white"
-          >
-            <Edit2 size={14} />
-          </button>
-        </div>
+        {canEdit && (
+          <div className="flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                handleMove("backward");
+              }}
+              disabled={!canMoveBackward || update.isPending}
+              className="rounded-full border border-slate-700/60 bg-black/30 p-1 text-slate-400 hover:border-slate-500 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                handleMove("forward");
+              }}
+              disabled={!canMoveForward || update.isPending}
+              className="rounded-full border border-slate-700/60 bg-black/30 p-1 text-slate-400 hover:border-slate-500 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <ChevronRight size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onOpen(task.id);
+              }}
+              className="rounded-full border border-slate-700/60 bg-black/30 p-1 text-slate-400 hover:border-slate-500 hover:text-white"
+            >
+              <Edit2 size={14} />
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="space-y-2">

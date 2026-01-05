@@ -18,7 +18,7 @@ export function useReorderTasks(boardId: string) {
     onMutate: async (payload) => {
       await queryClient.cancelQueries({ queryKey: ["tasks", boardId] });
       const previous = queryClient.getQueryData<{ tasks: Task[] }>(["tasks", boardId]);
-      queryClient.setQueryData(["tasks", boardId], (old) => {
+      queryClient.setQueryData<{ tasks: Task[] }>(["tasks", boardId], (old) => {
         if (!old) return old;
         const map = new Map(payload.updates.map((u) => [u.taskId, u]));
         const updated = old.tasks.map((task) => {
@@ -33,7 +33,7 @@ export function useReorderTasks(boardId: string) {
       });
       return { previous };
     },
-    onError: (error: ApiError, _payload, context: { previous?: { tasks: Task[] } } | undefined) => {
+    onError: (_error: ApiError, _payload, context: { previous?: { tasks: Task[] } } | undefined) => {
       if (context?.previous) {
         queryClient.setQueryData(["tasks", boardId], context.previous);
       }

@@ -134,8 +134,8 @@ export async function updateTaskStatusController(req: Request, res: Response, ne
   try {
     const userId = (req as any).user.id;
 
-    const { assertBoardAccess } = await import("../boards/boards.service");
-    await assertBoardAccess(userId, boardId);
+    const { assertBoardRole } = await import("../boards/boards.service");
+    await assertBoardRole(userId, boardId, ["OWNER", "EDITOR"]);
 
     const payload: Record<string, any> = {};
     if (status) payload.status = status;

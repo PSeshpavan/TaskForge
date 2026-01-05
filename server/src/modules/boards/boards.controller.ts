@@ -6,10 +6,15 @@ import {
   updateBoardName,
   deleteBoardAndMembers,
   addMemberByEmail,
+  updateMemberRole,
+  removeMember,
   assertBoardAccess,
   assertOwner,
+  getUserBoardRole,
+  normalizeRole,
 } from "./boards.service";
 import { safeUser } from "../auth/auth.service";
+import { User } from "../auth/user.model";
 
 function toBoardShape(b: any) {
   return { id: b._id.toString(), name: b.name, ownerId: b.ownerId.toString(), createdAt: b.createdAt, updatedAt: b.updatedAt };
@@ -23,7 +28,7 @@ function toMemberShape(m: any) {
   return {
     id: m._id.toString(),
     boardId: m.boardId.toString(),
-    role: m.role,
+    role: normalizeRole(m.role),
     user: safe,
   };
 }
@@ -46,8 +51,28 @@ export async function listBoardsController(req: Request, res: Response, next: Ne
   const userId = (req as any).user.id;
   console.log("[boardsController] listBoardsController start", { userId });
   try {
-    const boards = await listBoardsForUser(userId);
-    const payload = boards.map(toBoardShape);
+    const { boards, memberships } = await listBoardsForUser(userId);
+    const ownerIds = Array.from(new Set(boards.map((board) => board.ownerId.toString())));
+    const owners = await User.find({ _id: { $in: ownerIds } }).lean().exec();
+    const ownerMap = new Map(owners.map((owner) => [owner._id.toString(), safeUser(owner)]));
+    const membershipMap = new Map(memberships.map((m: any) => [m.boardId.toString(), m]));
+
+    const payload = boards.map((board: any) => {
+      const boardId = board._id.toString();
+      const owner = ownerMap.get(board.ownerId.toString()) ?? {
+        id: board.ownerId.toString(),
+        name: "Unknown",
+        email: "",
+      };
+      const isOwner = board.ownerId.toString() === userId;
+      const memberRole = membershipMap.get(boardId)?.role;
+      const myRole = isOwner ? "OWNER" : normalizeRole(memberRole);
+      return {
+        ...toBoardShape(board),
+        owner,
+        myRole,
+      };
+    });
     console.log("[boardsController] listBoardsController success", { count: payload.length });
     return res.json({ boards: payload });
   } catch (err) {
@@ -64,7 +89,18 @@ export async function getBoardController(req: Request, res: Response, next: Next
     await assertBoardAccess(userId, boardId);
     const data = await getBoardWithMembers(boardId);
     if (!data) return res.status(404).json({ message: "Not Found" });
-    const payload = { board: toBoardShape(data.board), members: data.members.map(toMemberShape) };
+    const ownerDoc = await User.findById(data.board.ownerId).lean().exec();
+    const owner = ownerDoc ? safeUser(ownerDoc) : null;
+    const myRole = (await getUserBoardRole(userId, boardId)) ?? "VIEWER";
+    const payload = {
+      board: toBoardShape(data.board),
+      owner,
+      members: data.members.map((member) => ({
+        ...toMemberShape(member),
+        role: normalizeRole(member.role),
+      })),
+      myRole,
+    };
     console.log("[boardsController] getBoardController success", { boardId, members: payload.members.length });
     return res.json(payload);
   } catch (err) {
@@ -109,10 +145,10 @@ export async function deleteBoardController(req: Request, res: Response, next: N
 export async function addMemberController(req: Request, res: Response, next: NextFunction) {
   const userId = (req as any).user.id;
   const { boardId } = req.params;
-  const { email, role } = req.body;
-  console.log("[boardsController] addMemberController start", { userId, boardId, email, role });
+  const { email } = req.body;
+  console.log("[boardsController] addMemberController start", { userId, boardId, email });
   try {
-    await addMemberByEmail(userId, boardId, email, role || "MEMBER");
+    await addMemberByEmail(userId, boardId, email);
     const updated = await getBoardWithMembers(boardId);
     if (!updated) return res.status(404).json({ message: "Board not found" });
     const members = updated.members.map(toMemberShape);
@@ -120,6 +156,41 @@ export async function addMemberController(req: Request, res: Response, next: Nex
     return res.json({ members });
   } catch (err) {
     console.error("[boardsController] addMemberController error", err);
+    next(err);
+  }
+}
+
+export async function updateMemberController(req: Request, res: Response, next: NextFunction) {
+  const userId = (req as any).user.id;
+  const { boardId, memberId } = req.params;
+  const { role } = req.body;
+  console.log("[boardsController] updateMemberController start", { userId, boardId, memberId, role });
+  try {
+    await updateMemberRole(userId, boardId, memberId, role);
+    const updated = await getBoardWithMembers(boardId);
+    if (!updated) return res.status(404).json({ message: "Board not found" });
+    const members = updated.members.map((member) => ({ ...toMemberShape(member), role: normalizeRole(member.role) }));
+    console.log("[boardsController] updateMemberController success", { boardId, count: members.length });
+    return res.json({ members });
+  } catch (err) {
+    console.error("[boardsController] updateMemberController error", err);
+    next(err);
+  }
+}
+
+export async function removeMemberController(req: Request, res: Response, next: NextFunction) {
+  const userId = (req as any).user.id;
+  const { boardId, memberId } = req.params;
+  console.log("[boardsController] removeMemberController start", { userId, boardId, memberId });
+  try {
+    await removeMember(userId, boardId, memberId);
+    const updated = await getBoardWithMembers(boardId);
+    if (!updated) return res.status(404).json({ message: "Board not found" });
+    const members = updated.members.map(toMemberShape);
+    console.log("[boardsController] removeMemberController success", { boardId, count: members.length });
+    return res.json({ members });
+  } catch (err) {
+    console.error("[boardsController] removeMemberController error", err);
     next(err);
   }
 }
