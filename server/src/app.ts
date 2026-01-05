@@ -14,7 +14,17 @@ import { tasksRouter } from "./modules/tasks/tasks.routes";
 export function createApp() {
   const app = express();
 
-  app.use(cors(buildCorsOptions()));
+  // ✅ REQUIRED on Render (behind proxy) so secure cookies work correctly
+  app.set("trust proxy", 1);
+
+  const corsOptions = buildCorsOptions();
+
+  // ✅ CORS must run before routes
+  app.use(cors(corsOptions));
+
+  // ✅ Handle preflight for all routes
+  app.options("*", cors(corsOptions));
+
   app.use(express.json());
   app.use(cookieParser());
 
