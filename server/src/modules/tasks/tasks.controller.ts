@@ -10,6 +10,29 @@ import {
 } from "./tasks.service";
 import { Task } from "./tasks.model";
 
+function parseCsvQuery(value: unknown): string[] {
+  const result: string[] = [];
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((label: string) => label.trim())
+      .filter(Boolean);
+  }
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      if (typeof entry === "string") {
+        result.push(
+          ...entry
+            .split(",")
+            .map((label: string) => label.trim())
+            .filter(Boolean)
+        );
+      }
+    }
+  }
+  return result;
+}
+
 function toTaskShape(t: any) {
   if (!t) return null;
   return {
@@ -48,14 +71,8 @@ export async function listTasksController(req: Request, res: Response, next: Nex
   const { boardId } = req.params;
   console.log("[tasksController] listTasksController start", { userId, boardId });
   try {
-    const labelsParam = req.query.labels;
-    let labels: string[] | undefined;
-    if (typeof labelsParam === "string") {
-      labels = labelsParam.split(",").map((label) => label.trim()).filter(Boolean);
-    } else if (Array.isArray(labelsParam)) {
-      labels = labelsParam.flatMap((value) => value.split(",").map((label) => label.trim())).filter(Boolean);
-    }
-    const tasks = await listTasksForBoard(userId, boardId, { labels });
+    const labels = parseCsvQuery(req.query.labels);
+    const tasks = await listTasksForBoard(userId, boardId, { labels: labels.length ? labels : undefined });
     const payload = tasks.map(toTaskShape);
     console.log("[tasksController] listTasksController success", { boardId, count: payload.length });
     return res.json({ tasks: payload });
